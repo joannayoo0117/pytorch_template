@@ -13,6 +13,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from data_utils import CustomDataset
 from models import Model
@@ -22,6 +23,15 @@ hparams = Hparams()
 parser = hparams.parser
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+if args.cuda:
+    try:
+        torch.cuda.device(args.cuda_device)
+    except:
+        print('Using default CUDA device..')
+        pass
+
+writer = SummaryWriter(log_dir=args.log_dir)
 
 random.seed(args.seed)
 np.random.seed(args.seed)
@@ -56,6 +66,7 @@ model = Model()
 optimizer = optim.Adam(model.parameters(), 
                        lr=args.lr, 
                        weight_decay=args.weight_decay)
+criterion = nn.CrossEntropyLoss()
 
 if args.cuda:
     model.cuda()
@@ -74,6 +85,9 @@ def train(epoch):
     output = model(features, labels)
     loss_train = F.nll_loss(output, label)
     acc_train = accuracy(output, label)
+
+    writer.add_scalar('Training Loss', loss_train.data.item(), epoch)
+    writer.add_scalar('Training Accuracy', acc_train.data.item(), epoch)
 
     loss_train.backward()
     optimizer.step()
@@ -97,6 +111,9 @@ def evaluate():
     output = model(features, labels)
     loss_val = F.nll_loss(output, label)
     acc_val = accuracy(output, label)
+
+    writer.add_scalar('Training Loss', loss_val.data.item(), epoch)
+    writer.add_scalar('Training Accuracy', acc_val.data.item(), epoch)
 
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_val: {:.4f}'.format(loss_val.data.item()),
@@ -130,7 +147,7 @@ for epoch in range(args.epochs):
 
     if epoch % 20 == 0:
         evaluate()
-    torch.save(model.state_dict(), '{}.pkl'.format(epoch))
+    torch.save(model.state_dict(), '{}/{}.pkl'.format(args.model_dir, epoch))
 
     if loss_values[-1] < best:
         best = loss_values[-1]
@@ -142,13 +159,13 @@ for epoch in range(args.epochs):
     if bad_counter == args.patience:
         break
 
-    files = glob.glob('*.pkl')
+    files = glob.glob('{}/*.pkl'.format(args.model_dir))
     for file in files:
         epoch_nb = int(file.split('.')[0])
         if epoch_nb < best_epoch:
             os.remove(file)
 
-files = glob.glob('*.pkl')
+files = glob.glob('{}/*.pkl'.format(args.model_dir))
 for file in files:
     epoch_nb = int(file.split('.')[0])
     if epoch_nb > best_epoch:
@@ -159,7 +176,9 @@ print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
 # Restore best model
 print('Loading {}th epoch'.format(best_epoch))
-model.load_state_dict(torch.load('{}.pkl'.format(best_epoch)))
+model.load_state_dict(
+    torch.load('{}/{}.pkl'.format(args.model_dir, best_epoch)))
 
 # Testing
 compute_test()
+writer.close()

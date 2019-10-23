@@ -5,6 +5,8 @@ class Hparams:
     
     parser.add_argument('--no-cuda', action='store_true', default=False, 
         help='Disables CUDA training.')
+    parser.add_argument('--cuda_device', type=int, default=0,
+        help="Specifies cuda device"
     parser.add_argument('--seed', type=int, default=72, 
         help='Random seed.')
     parser.add_argument('--epochs', type=int, default=10000, 
@@ -19,3 +21,7 @@ class Hparams:
         help='Train-test split ratio')
     parser.add_argument('--dropout', type=float, default=0.3, 
         help='Dropout rate (1 - keep probability).')
+    parser.add_argument('--model_dir', type=str, default='./model',
+        help='Directory to save model')
+    parser.add_argument('--log_dir', type=str, default='./logs',
+        help='Directory to save logs')
